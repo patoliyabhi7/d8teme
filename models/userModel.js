@@ -96,6 +96,11 @@ const userSchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     }],
+    role: {
+        type: String,
+        enum: ['Admin', 'User'],
+        default: 'User'
+    },
     passwordChangedAt: Date,
     passwordResetToken: String,
     passwordResetExpires: Date
