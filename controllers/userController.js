@@ -109,6 +109,7 @@ exports.login = catchAsync(async (req, res, next) => {
         return next(new AppError("Email or password incorrect", 401))
 
     createSendToken(user, 201, res)
+
 })
 
 exports.forgotPassword = catchAsync(async (req, res, next) => {
@@ -200,4 +201,46 @@ exports.updateProfile = catchAsync(async (req, res, next) => {
             user: updatedUser
         }
     })
+})
+
+exports.verifyEmail = catchAsync(async (req, res, next) => {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+        return next(new AppError('User not found', 404))
+    }
+    if (user.validEmail) {
+        return next(new AppError('Email is already verified!', 400))
+    }
+    const otp = Math.floor(Math.random() * 9000 + 1000);
+    res.cookie("otp", otp, { maxAge: 120000 })
+    const message = `OTP for email verification is ${otp}`
+    await sendEmail({ email: user.email, subject: 'Email verification OTP', message })
+    res.status(200).json({
+        status: 'success',
+        message: 'OTP Sent to Email'
+    })
+})
+
+exports.verifyEmailOtp = catchAsync(async (req, res, next) => {
+    const enteredOtp = req.body.otp;
+    if (!enteredOtp) {
+        return next(new AppError('Please enter OTP', 400))
+    }
+    const sentOtp = req.cookies.otp;
+    res.clearCookie("otp");
+    if (enteredOtp === sentOtp) {
+        const currentUser = await User.findById(req.user.id)
+        if (!currentUser) {
+            return next(new AppError('User not found or not logged in', 404))
+        }
+        currentUser.validEmail = true;
+        await currentUser.save({ validateBeforeSave: false });
+        res.status(200).json({
+            status: 'success',
+            message: 'Email Verification Successfull!'
+        })
+    }
+    else {
+        return next(new AppError('OTP Invalid or Expired!'), 500)
+    }
 })
