@@ -174,23 +174,26 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 
 exports.updateProfile = catchAsync(async (req, res, next) => {
     if (req.body.password || req.body.passwordConfirm) {
-        return next(new AppError("This route is not for password update. Please use /updatePassword", 400))
+        return next(new AppError('This route is not for password update. Please use /updatePassword', 400))
     }
+    // const filteredBody = filterObj(req.body, 'firstname', 'lastname', 'dob', 'phone', 'email ', 'favourite')
     const filteredBody = filterObj(req.body, 'firstname', 'lastname', 'email', 'dob', 'phone', 'profileImage', 'interest', 'height', 'bodyType', 'bioContent')
-    if (req.email !==  req.body.email) {
+    if (req.email !== req.body.email) {
         const user = await User.findOne({ email: req.body.email })
         if (user) {
-            return next(new AppError("Email already exists", 400))
+            return next(new AppError('Email already exists', 400))
         }
     }
     if (req.phone !== req.body.phone) {
         const user = await User.findOne({ phone: req.body.phone })
         if (user) {
-            return next(new AppError("Phone number already exists", 400))
+            return next(new AppError('Phone number already exists', 400))
         }
     }
     if (req.file) filteredBody.profileImage = req.file.filename;
+
     const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, { new: true, runValidators: true })
+
     res.status(200).json({
         status: 'success',
         data: {
