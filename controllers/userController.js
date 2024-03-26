@@ -4,6 +4,7 @@ const User = require('./../models/userModel');
 const sendEmail = require('./../utils/email');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const twilio = require('twilio');
 const { promisify } = require('util');
 
 const signToken = (id) => {
@@ -217,8 +218,6 @@ exports.sendVerificationEmail = catchAsync(async (req, res, next) => {
 
     // Verification URL token generation & set cookie
     const verificationToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
- 
     res.cookie("verificationToken", verificationToken, { maxAge: 180000 })
     const verificationUrl = `${req.protocol}://${req.get('host')}/api/v1/user/verifyEmail/${verificationToken}`
 
@@ -290,6 +289,67 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
         else {
             return next(new AppError("Token Invalid or Expired", 400))
         }
+    }
+})
+
+exports.sendPhoneOtpSms = catchAsync(async (req, res, next) => {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+        return next(new AppError('User not found', 404))
+    }
+    if (user.validPhone) {
+        return next(new AppError('Phone Number is already verified!', 400))
+    }
+    const otp = Math.floor(Math.random() * 9000 + 1000);
+    const message = `OTP for Phone Number verification is ${otp}`
+    const client = new twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN)
+    try {
+        await client.messages.create({
+            body: message,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: user.phone
+        });
+        res.cookie("otp", otp, { maxAge: 180000 });
+        res.status(200).json({
+            status: 'success',
+            message: 'SMS Sent Successfull!'
+        })
+    } catch (error) {
+        console.log(error)
+        return next(new AppError("Error while sending the SMS!", 400))
+    }
+})
+
+exports.verifySmsOtp = catchAsync(async (req, res, next) => {
+    const enteredOtp = req.body.otp;
+    if (!enteredOtp) {
+        return next(new AppError("Please enter OTP", 400));
+    }
+
+    const sentOtp = req.cookies.otp;
+    if (!sentOtp) {
+        return next(new AppError("OTP Expired!!", 500))
+    }
+
+    const currentUser = await User.findById(req.user.id)
+    if (!currentUser) {
+        return next(new AppError("User not found!", 404))
+    }
+    if (enteredOtp === sentOtp) {
+        try {
+            currentUser.validPhone = true;
+            await currentUser.save({ validateBeforeSave: false })
+            res.clearCookie("otp");
+            res.status(200).json({
+                status: 'success',
+                message: 'Phone Number Verified Successfully!!'
+            })
+        } catch (error) {
+            return next(new AppError("Error while verifying the OTP", 400))
+        }
+    }
+    else {
+        return next(new AppError("OTP Invalid or Expired", 400))
     }
 
 })

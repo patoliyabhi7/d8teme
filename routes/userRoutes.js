@@ -11,5 +11,7 @@ router.patch("/updatePassword",userController.protect, userController.updatePass
 router.patch("/updateProfile",userController.protect, userController.updateProfile);
 router.post("/sendVerificationEmail",userController.protect, userController.sendVerificationEmail);
 router.post("/verifyEmail/:token?",userController.protect, userController.verifyEmail);
+router.post("/sendPhoneOtpSms",userController.protect, userController.sendPhoneOtpSms);
+router.post("/verifySmsOtp",userController.protect, userController.verifySmsOtp);
 
 module.exports = router;
