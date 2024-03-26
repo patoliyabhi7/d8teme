@@ -135,11 +135,18 @@ userSchema.methods.changedPasswordAfter = function (JWTTimeStamp) {
 }
 
 userSchema.methods.createPasswordResetToken = function () {
-    const resetToken = crypto.randomBytes(32).toString('hex')
-    this.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex')
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    this.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
     this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
     return resetToken;
 }
+
+// userSchema.methods.createEmailVerificationToken = function (){
+//     const verificationToken = crypto.randomBytes(32).toString('hex');
+//     const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+//     res.cookie("token", hashedToken, { maxAge: 600000 })
+//     return verificationToken;
+// }
 
 const User = mongoose.model('User', userSchema);
 module.exports = User

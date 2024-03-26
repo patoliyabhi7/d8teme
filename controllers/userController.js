@@ -203,7 +203,7 @@ exports.updateProfile = catchAsync(async (req, res, next) => {
     })
 })
 
-exports.verifyEmail = catchAsync(async (req, res, next) => {
+exports.sendVerificationEmail = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.user.id);
     if (!user) {
         return next(new AppError('User not found', 404))
@@ -211,36 +211,85 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
     if (user.validEmail) {
         return next(new AppError('Email is already verified!', 400))
     }
+    // OTP generation and set cookie
     const otp = Math.floor(Math.random() * 9000 + 1000);
-    res.cookie("otp", otp, { maxAge: 120000 })
-    const message = `OTP for email verification is ${otp}`
-    await sendEmail({ email: user.email, subject: 'Email verification OTP', message })
-    res.status(200).json({
-        status: 'success',
-        message: 'OTP Sent to Email'
-    })
-})
+    res.cookie("otp", otp, { maxAge: 180000 })
 
-exports.verifyEmailOtp = catchAsync(async (req, res, next) => {
-    const enteredOtp = req.body.otp;
-    if (!enteredOtp) {
-        return next(new AppError('Please enter OTP', 400))
-    }
-    const sentOtp = req.cookies.otp;
-    res.clearCookie("otp");
-    if (enteredOtp === sentOtp) {
-        const currentUser = await User.findById(req.user.id)
-        if (!currentUser) {
-            return next(new AppError('User not found or not logged in', 404))
-        }
-        currentUser.validEmail = true;
-        await currentUser.save({ validateBeforeSave: false });
+    // Verification URL token generation & set cookie
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+ 
+    res.cookie("verificationToken", verificationToken, { maxAge: 180000 })
+    const verificationUrl = `${req.protocol}://${req.get('host')}/api/v1/user/verifyEmail/${verificationToken}`
+
+    const message = `OTP for email verification is ${otp} \nClick the link to verify email ${verificationUrl}`
+    try {
+        await sendEmail({ email: user.email, subject: 'Email verification OTP and Link', message })
         res.status(200).json({
             status: 'success',
-            message: 'Email Verification Successfull!'
+            message: 'OTP & Link Sent to Email'
         })
+    } catch (error) {
+        res.clearCookie("otp");
+        res.clearCookie("verificationToken");
+        return next(new AppError("There was an error sending the mail"))
     }
-    else {
-        return next(new AppError('OTP Invalid or Expired!'), 500)
+})
+
+exports.verifyEmail = catchAsync(async (req, res, next) => {
+    const enteredOtp = req.body.otp;
+    const paramsToken = req.params.token;
+
+    if (!enteredOtp && !paramsToken) {
+        return next(new AppError('Please enter OTP or Verification Token', 400))
     }
+
+    if (!req.cookies.otp && enteredOtp) {
+        return next(new AppError("OTP expired", 500));
+    }
+    if (!req.cookies.verificationToken && paramsToken) {
+        return next(new AppError("Token expired", 500));
+    }
+
+    const sentOtp = req.cookies.otp;
+    const sentToken = req.cookies.verificationToken;
+    const currentUser = await User.findById(req.user.id)
+
+    if (enteredOtp) {
+        if (enteredOtp === sentOtp) {
+            if (!currentUser) {
+                return next(new AppError('User not found or not logged in', 404))
+            }
+            currentUser.validEmail = true;
+            await currentUser.save({ validateBeforeSave: false });
+            res.clearCookie("otp");
+            res.clearCookie("verificationToken");
+            res.status(200).json({
+                status: 'success',
+                message: 'Email Verification Successfull!'
+            })
+        }
+        else {
+            return next(new AppError('OTP Invalid or Expired!', 500))
+        }
+    }
+    else if (paramsToken) {
+        if (paramsToken === sentToken) {
+            if (!currentUser) {
+                return next(new AppError('User not found or not logged in', 404))
+            }
+            currentUser.validEmail = true;
+            await currentUser.save({ validateBeforeSave: false });
+            res.clearCookie("otp");
+            res.clearCookie("verificationToken");
+            res.status(200).json({
+                status: 'success',
+                message: 'Email Verification Successfull!'
+            })
+        }
+        else {
+            return next(new AppError("Token Invalid or Expired", 400))
+        }
+    }
+
 })
