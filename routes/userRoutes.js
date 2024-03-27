@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.post("/signup", userController.signup);
 router.post("/login", userController.login);
-router.get("/logout", userController.protect, userController.logout);
+// router.get("/logout", userController.protect, userController.logout);
 router.post("/forgotPassword", userController.forgotPassword);
 router.patch("/resetPassword/:token", userController.resetPassword);
 router.patch("/updatePassword", userController.protect, userController.updatePassword);
@@ -15,6 +15,7 @@ router.post("/sendVerificationEmail", userController.protect, userController.sen
 router.post("/verifyEmail/:token?", userController.protect, userController.verifyEmail);
 router.post("/sendPhoneOtpSms", userController.protect, userController.sendPhoneOtpSms);
 router.post("/verifySmsOtp", userController.protect, userController.verifySmsOtp);
+router.post("/sendRequest", userController.protect, userController.sendRequest);
 
 // Google Passport
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));

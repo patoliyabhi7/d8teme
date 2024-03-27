@@ -1,7 +1,7 @@
 const AppError = require('./../utils/appError');
 const catchAsync = require('./../utils/catchAsync');
 const User = require('./../models/userModel');
-// const Google = require('./../models/googleModel');
+const UserRequest = require('./../models/userRequestModel');
 const sendEmail = require('./../utils/email');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -109,19 +109,22 @@ exports.login = catchAsync(async (req, res, next) => {
         return next(new AppError("Email and password required!!", 404))
     }
     const user = await User.findOne({ email: email }).select('+password')
+    if (user.googleId) {
+        return next(new AppError("Please login via 'LOGIN WITH GOOGLE'", 404))
+    }
     if (!user || !(await user.correctPassword(password, user.password)))
         return next(new AppError("Email or password incorrect", 401))
 
     createSendToken(user, 201, res)
 })
 
-exports.logout = (req, res) => {
-    res.cookie('jwt', 'loggedout', {
-        expires: new Date(Date.now() + 10 * 1000), // expires in 10 seconds
-        httpOnly: true,
-    });
-    res.status(200).json({ status: 'success', message: 'User logged out success' });
-};
+// exports.logout = (req, res) => {
+//     res.cookie('jwt', 'loggedout', {
+//         expires: new Date(Date.now() + 10 * 1000), // expires in 10 seconds
+//         httpOnly: true,
+//     });
+//     res.status(200).json({ status: 'success', message: 'User logged out success' });
+// };
 
 exports.forgotPassword = catchAsync(async (req, res, next) => {
     if (!req.body.email) {
@@ -409,3 +412,68 @@ exports.googlePassport = catchAsync(async (req, res, next) => {
     });
 })
 
+exports.sendRequest = catchAsync(async (req, res, next) => {
+    try {
+        const currentUser = await User.findById(req.user.id);
+        const recipientUser = await User.findById(req.body.id);
+        if(!req.body.id){
+            res.status(400).json({
+                status: 'failure',
+                message: `Please enter the recipient id`
+            })
+            return next(new AppError("Please enter the recipient id", 400));
+        }
+        if (!currentUser) {
+            res.status(400).json({
+                status: 'failure',
+                message: `User not found or not logged in!`
+            })
+            return next(new AppError("User not found or not logged in!", 404))
+        }
+        if (!recipientUser) {
+            res.status(400).json({
+                status: 'failure',
+                message: `Recepient User not found!`
+            })
+            return next(new AppError("Recepient User not found!", 404))
+        }
+        if (currentUser.id === recipientUser.id) {
+            // return next(new AppError("Both the users are same!!", 500))
+            res.status(200).json({
+                message: `Both the users are same!!`
+            })
+            return next();
+        }
+        if (currentUser.friends.includes(recipientUser.id)) {
+            // return next(new AppError("Both users are already friends"))
+            res.status(200).json({
+                message: `Both Users are already friends`
+            })
+            return next();
+        }
+        const rowUserRequest = await UserRequest.findOne({ senderId: currentUser.id, recipientId: recipientUser.id });
+        // if(UserRequest.senderId === currentUser.id && UserRequest.recipientId === recipientUser.id){
+        if (rowUserRequest) {
+            // return next(new AppError(`Request is already sent and request status is ${rowUserRequest.status}`, 400))
+            res.status(200).json({
+                message: `Request is already sent and request status is ${rowUserRequest.status}`
+            })
+            return next()
+        }
+
+        const newUserRequest = await UserRequest.create({
+            senderId: currentUser.id,
+            recipientId: recipientUser.id
+        })
+        if (!newUserRequest) {
+            return next(new AppError("Error while sending the request", 500))
+        }
+        res.status(200).json({
+            status: 'success',
+            message: `Request sent successfully`
+        })
+    } catch (error) {
+        console.log(error)
+        return next(new AppError("Error", 500))
+    }
+})
