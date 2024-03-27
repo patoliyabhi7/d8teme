@@ -115,6 +115,14 @@ exports.login = catchAsync(async (req, res, next) => {
     createSendToken(user, 201, res)
 })
 
+exports.logout = (req, res) => {
+    res.cookie('jwt', 'loggedout', {
+        expires: new Date(Date.now() + 10 * 1000), // expires in 10 seconds
+        httpOnly: true,
+    });
+    res.status(200).json({ status: 'success', message: 'User logged out success' });
+};
+
 exports.forgotPassword = catchAsync(async (req, res, next) => {
     if (!req.body.email) {
         return next(new AppError("Please enter your email to reset password"))
@@ -400,3 +408,4 @@ exports.googlePassport = catchAsync(async (req, res, next) => {
         done(null, user);
     });
 })
+
