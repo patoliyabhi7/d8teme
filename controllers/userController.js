@@ -363,7 +363,6 @@ exports.googlePassport = catchAsync(async (req, res, next) => {
         scope: ["profile", "email"]
     }, async (accessToken, refreshToken, profile, done) => {
         // console.log("Profile: ", profile)
-        // console.log("Email: ", email)
         const newUser = {
             googleId: profile.id,
             // displayName: profile.displayName,
@@ -375,7 +374,8 @@ exports.googlePassport = catchAsync(async (req, res, next) => {
         };
         try {
             //find the user in our database
-            let user = await User.findOne({ googleId: profile.id });
+            // let user = await User.findOne({ googleId: profile.id });
+            let user = await User.findOne({ $or: [{ googleId: profile.id }, { email: profile.email }] });
             if (user) {
                 //If user present in our database.
                 done(null, user);
