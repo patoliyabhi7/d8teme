@@ -1,11 +1,14 @@
 const AppError = require('./../utils/appError');
 const catchAsync = require('./../utils/catchAsync');
 const User = require('./../models/userModel');
+// const Google = require('./../models/googleModel');
 const sendEmail = require('./../utils/email');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const twilio = require('twilio');
 const { promisify } = require('util');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth2').Strategy;
 
 const signToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -110,7 +113,6 @@ exports.login = catchAsync(async (req, res, next) => {
         return next(new AppError("Email or password incorrect", 401))
 
     createSendToken(user, 201, res)
-
 })
 
 exports.forgotPassword = catchAsync(async (req, res, next) => {
@@ -351,5 +353,50 @@ exports.verifySmsOtp = catchAsync(async (req, res, next) => {
     else {
         return next(new AppError("OTP Invalid or Expired", 400))
     }
+})
 
+exports.googlePassport = catchAsync(async (req, res, next) => {
+    passport.use(new GoogleStrategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: "http://localhost:8001/api/v1/user/google/callback",
+        scope: ["profile", "email"]
+    }, async (accessToken, refreshToken, profile, done) => {
+        // console.log("Profile: ", profile)
+        // console.log("Email: ", email)
+        const newUser = {
+            googleId: profile.id,
+            // displayName: profile.displayName,
+            firstname: profile.name.givenName,
+            lastname: profile.name.familyName,
+            profileImage: profile.photos[0].value,
+            email: profile.emails[0].value,
+            validEmail: true
+        };
+        try {
+            //find the user in our database
+            let user = await User.findOne({ googleId: profile.id });
+            if (user) {
+                //If user present in our database.
+                done(null, user);
+            } else {
+                // if user is not preset in our database save user data to database.
+                user = await User.create(newUser);
+                done(null, user);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+    ));
+    // used to serialize the user for the session
+    passport.serializeUser((user, done) => {
+        done(null, user.id);
+    });
+
+    // used to deserialize the user
+    passport.deserializeUser(async (id, done) => {
+        const user = await User.findById(id);
+        done(null, user);
+    });
 })

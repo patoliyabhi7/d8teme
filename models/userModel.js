@@ -23,18 +23,23 @@ const userSchema = mongoose.Schema({
     },
     phone: {
         type: String,
-        required: true,
+        required: [function () {
+            return !this.googleId; // Required if not logging in via Google
+        }, 'Phone Number is required'],
         unique: true,
+        sparse: true, // Allows multiple documents to have a null value for this field
         validate: {
             validator: function (v) {
                 return /^[a-zA-Z0-9]{3,30}$/.test(v);
             },
-            message: (props) => `${props.value} is not a valid Password!`,
+            message: (props) => `${props.value} is not a valid Phone Number!`,
         }
-    },
+    },    
     dob: {
         type: Date,
-        required: true
+        required: [function () {
+            return !this.googleId; 
+        }, 'DOB is required'],
     },
     profileImage: {
         type: String
@@ -42,12 +47,13 @@ const userSchema = mongoose.Schema({
     gender: {
         type: String,
         enum: ['Male', 'Female'],
-        required: true
+        required: [function () {
+            return !this.googleId; 
+        }, 'Gender is required'],
     },
     interest: {
         type: String,
         enum: ['Male', 'Female'],
-        required: true
     },
     member_status: {
         type: Boolean,
@@ -70,13 +76,17 @@ const userSchema = mongoose.Schema({
     },
     password: {
         type: String,
-        required: [true, 'Password is required'],
+        required: [function () {
+            return !this.googleId; 
+        }, 'Password is required'],
         minlength: 5,
         select: false
     },
     passwordConfirm: {
         type: String,
-        required: [true, 'Confirm Password is required'],
+        required: [function () {
+            return !this.googleId; 
+        }, 'Confirm Password is required'],
         validate: {
             validator: function (el) {
                 return el === this.password
@@ -103,7 +113,19 @@ const userSchema = mongoose.Schema({
     },
     passwordChangedAt: Date,
     passwordResetToken: String,
-    passwordResetExpires: Date
+    passwordResetExpires: Date,
+
+    // Different google fields
+    googleId: {
+        type: String,
+        required: [function () {
+            return this.googleId; 
+        }, 'GoogleId is required'],
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    },
 })
 
 userSchema.pre('save', async function (next) {
