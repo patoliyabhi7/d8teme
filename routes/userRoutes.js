@@ -20,6 +20,7 @@ router.post("/respondRequest", userController.protect, userController.respondReq
 router.get("/getFriends", userController.protect, userController.getFriends);
 router.get("/getSentPendingRequests", userController.protect, userController.getSentPendingRequests);
 router.get("/getReceivedPendingRequests", userController.protect, userController.getReceivedPendingRequests);
+router.post("/removeFriends", userController.protect, userController.removeFriends);
 
 // Google Passport
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));

@@ -465,7 +465,7 @@ exports.sendRequest = catchAsync(async (req, res, next) => {
             return next();
         }
         if (reverseRequestCheck) {
-            if (reverseRequestCheck.status === 'Accept') {
+            if (reverseRequestCheck.status === 'Accepted') {
                 res.status(200).json({
                     message: `You both are already friends`
                 })
@@ -475,7 +475,7 @@ exports.sendRequest = catchAsync(async (req, res, next) => {
                     message: `User has already sent you request and it is pending. Please review the request`
                 })
             }
-            if (reverseRequestCheck.status === 'Reject') {
+            if (reverseRequestCheck.status === 'Rejected') {
                 res.status(200).json({
                     message: `Reject is rejected by you`
                 })
@@ -670,5 +670,44 @@ exports.getReceivedPendingRequests = catchAsync(async (req, res, next) => {
         status: 'success',
         results: list.length,
         list
+    })
+})
+
+exports.removeFriends = catchAsync(async (req, res, next) => {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+        return next(new AppError("User not found or not logged in"))
+    }
+    const friendId = req.body.id;
+    if (!friendId) {
+        res.status(404).json({
+            message: `Please provide friend id`
+        })
+        return next(new AppError("Please provide friend id", 404))
+    }
+    // All 3 of these works same
+    // const otherUser = await User.findOne({_id: friendId, friends: {$elemMatch: {$eq: currentUser.id}}}); 
+    // const otherUser = await User.findById(friendId).where('friends').equals(currentUser._id);
+    const otherUser = await User.findOne({ _id: friendId, friends: { $in: [currentUser._id] } });
+    if (!otherUser) {
+        res.status(404).json({
+            message: `Both of you are not friends!!`
+        })
+        return next(new AppError("Both of you are not friends!!!", 404))
+    }
+    let reqRow = await UserRequest.findOneAndDelete({
+        $or: [
+          { senderId: currentUser.id, recipientId: otherUser.id },
+          { senderId: otherUser.id, recipientId: currentUser.id }
+        ]
+      });
+    otherUser.friends.pull(currentUser.id)
+    currentUser.friends.pull(otherUser.id)
+    await otherUser.save({ validateBeforeSave: false });
+    await currentUser.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+        status: 'success',
+        message: `Friend removed successfully`
     })
 })
