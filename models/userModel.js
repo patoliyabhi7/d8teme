@@ -40,6 +40,7 @@ const userSchema = mongoose.Schema({
         required: [function () {
             return !this.googleId; 
         }, 'DOB is required'],
+        // set: (dob) => dob.setUTCHours(0, 0, 0, 0)
     },
     profileImage: {
         type: String
@@ -122,7 +123,7 @@ const userSchema = mongoose.Schema({
             return this.googleId; 
         }, 'GoogleId is required'],
     },
-    createdAt: {
+    joinedOn: {
         type: Date,
         default: Date.now,
     },
@@ -136,6 +137,13 @@ userSchema.pre('save', async function (next) {
     this.passwordConfirm = undefined;
     next();
 })
+
+// userSchema.pre('save', function(next) {
+//     if (typeof this.dob === 'string') {
+//         this.dob = new Date(this.dob);
+//     }
+//     next();
+// });
 
 userSchema.pre('save', function (next) {
     if (!this.isModified('password') || this.isNew) return next();

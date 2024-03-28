@@ -115,6 +115,9 @@ exports.login = catchAsync(async (req, res, next) => {
     if (!user || !(await user.correctPassword(password, user.password)))
         return next(new AppError("Email or password incorrect", 401))
 
+    user.lastOnline = Date.now();
+    await user.save({ validateBeforeSave: false })
+
     createSendToken(user, 201, res)
 })
 
@@ -440,7 +443,7 @@ exports.sendRequest = catchAsync(async (req, res, next) => {
         if (currentUser.id === recipientUser.id) {
             // return next(new AppError("Both the users are same!!", 500))
             res.status(200).json({
-                message: `Both the users are same!!`
+                message: `You can't send request to yourself. As both the users are same!!`
             })
             return next();
         }
@@ -459,21 +462,20 @@ exports.sendRequest = catchAsync(async (req, res, next) => {
             res.status(200).json({
                 message: `Request is already sent and request is ${rowUserRequest.status}`
             })
-            
             return next();
         }
-        if (reverseRequestCheck){
-            if(reverseRequestCheck.status === 'Accept'){
+        if (reverseRequestCheck) {
+            if (reverseRequestCheck.status === 'Accept') {
                 res.status(200).json({
                     message: `You both are already friends`
                 })
             }
-            if(reverseRequestCheck.status === 'Pending'){
+            if (reverseRequestCheck.status === 'Pending') {
                 res.status(200).json({
                     message: `User has already sent you request and it is pending. Please review the request`
                 })
             }
-            if(reverseRequestCheck.status === 'Reject'){
+            if (reverseRequestCheck.status === 'Reject') {
                 res.status(200).json({
                     message: `Reject is rejected by you`
                 })
@@ -497,11 +499,176 @@ exports.sendRequest = catchAsync(async (req, res, next) => {
     }
 })
 
-// exports.responseRequest = catchAsync(async (req, res, next) => {
-//     const currentUser = await User.findById(req.user.id);
-//     if(!currentUser){
-//         return next(new AppError("User not found or not logged in"))
-//     }
-//     const otherUser = req.body.id;
+exports.respondRequest = catchAsync(async (req, res, next) => {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+        return next(new AppError("User not found or not logged in"))
+    }
+    const requestId = req.body.id;
+    if (!requestId) {
+        res.status(404).json({
+            message: `Please enter the request ID`
+        })
+        return next(new AppError("Please enter the request ID", 404))
+    }
+    const requestRow = await UserRequest.findById(requestId); // Friend Request row data
+    if (!requestRow) {
+        res.status(404).json({
+            message: `Friend Request not found`
+        })
+        return next(new AppError("Friend Request not found", 404))
+    }
+    const senderProfile = await User.findById(requestRow.senderId.toString());
+    if (!senderProfile) {
+        res.status(404).json({
+            message: `Sender Profile not found or might deleted his profile`
+        })
+        return next(new AppError("Sender Profile not found or might deleted his profile", 404))
+    }
+    if (requestRow.recipientId.toString() !== currentUser.id.toString()) {
+        if (requestRow.senderId.toString() === currentUser.id.toString()) {
+            res.status(401).json({
+                message: `You have sent request so, you cannot respond to this request`
+            })
+            return next(new AppError("You have sent request so, you cannot respond to this request", 404))
+        }
+        res.status(401).json({
+            message: `You are not authorized to respond to this request`
+        })
+        return next(new AppError("You are not authorized to respond to this request", 404))
+    }
+    if (requestRow.status !== 'Pending') {
+        const message = requestRow.status.startsWith("Accept") ? `You are already friends!` : `Friend request is already ${requestRow.status} by you!`;
+        res.status(400).json({
+            message
+        })
+        return next(new AppError(`Friend request is already ${requestRow.status} by you!`, 404))
+    }
+    const reqRes = req.body.response;
+    if (!reqRes) {
+        res.status(404).json({
+            message: `Please enter your response to the request`
+        })
+        return next(new AppError("Please enter your response to the request", 404))
+    }
+    else if (reqRes === "Pending") {
+        res.status(404).json({
+            message: `Friend request is already in 'Pending' Status`
+        })
+        return next(new AppError("Friend request is already in 'Pending' Status", 404))
+    }
+    requestRow.status = reqRes;
+    await requestRow.save();
 
-// })`
+    const sId = senderProfile.id.toString();
+    const cId = currentUser.id.toString();
+    if (reqRes === "Accepted") {
+        senderProfile.friends.push(cId);
+        currentUser.friends.push(sId);
+        await senderProfile.save({ validateBeforeSave: false });
+        await currentUser.save({ validateBeforeSave: false });
+        res.status(200).json({
+            status: 'Success',
+            message: `Friend Request is ${reqRes}. Friend is added to your friends list`
+        })
+    }
+    if (reqRes === "Rejected") {
+        await UserRequest.deleteOne({ _id: requestId });
+        res.status(200).json({
+            status: 'Success',
+            message: `Friend Request ${reqRes} Successfully`
+        })
+    }
+    next();
+})
+
+exports.getFriends = catchAsync(async (req, res, next) => {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+        return next(new AppError("User not found or not logged in"))
+    }
+    const friends = currentUser.friends;
+    if (!friends || friends.length === 0) {
+        res.status(204).json({
+            message: `You have no friends`
+        })
+        return next(new AppError("You have no friends", 404))
+    }
+    const friendsList = [];
+    for (let i = 0; i < friends.length; i++) {
+        const friend = await User.findById(friends[i]).select("firstname lastname email dob friends profileImage gender lastOnline height bodyType bioContent joinedOn");
+        if (!friend) {
+            continue;
+        }
+        friendsList.push(friend);
+    }
+    res.status(200).json({
+        status: 'success',
+        results: friendsList.length,
+        friends: friendsList
+    })
+})
+
+exports.getSentPendingRequests = catchAsync(async (req, res, next) => {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+        return next(new AppError("User not found or not logged in"))
+    }
+    const getList = await UserRequest.find({ senderId: currentUser.id, status: 'Pending' })
+    if (!getList || getList.length === 0) {
+        res.status(200).json({
+            status: 'success',
+            message: `No Pending Requests Found`
+        })
+        return next();
+    }
+    const list = [];
+    for (let i = 0; i < getList.length; i++) {
+        const friend = await User.findById(getList[i].recipientId).select("firstname lastname email profileImage bioContent");
+        if (!friend) {
+            continue;
+        }
+        const updatedFriend = {
+            requestId: getList[i].id,
+            ...friend.toObject(),
+            status: getList[i].status
+        };
+        list.push(updatedFriend);
+    }
+    res.status(200).json({
+        status: 'success',
+        results: list.length,
+        list
+    })
+})
+
+exports.getReceivedPendingRequests = catchAsync(async (req, res, next) => {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+        return next(new AppError("User not found or not logged in"))
+    }
+    const getList = await UserRequest.find({ recipientId: currentUser.id, status: 'Pending' })
+    if (!getList || getList.length === 0) {
+        res.status(200).json({
+            status: 'success',
+            message: `No Pending Requests Found`
+        })
+        return next();
+    }
+    const list = []
+    for (i = 0; i < getList.length; i++) {
+        const friend = await User.findById(getList[i].senderId).select("firstname lastname email profileImage bioContent");
+        if (!friend) continue;
+        const updatedFriend = {
+            requestId: getList[i].id,
+            ...friend.toObject(),
+            status: getList[i].status
+        }
+        list.push(updatedFriend);
+    }
+    res.status(200).json({
+        status: 'success',
+        results: list.length,
+        list
+    })
+})

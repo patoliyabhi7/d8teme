@@ -16,6 +16,10 @@ router.post("/verifyEmail/:token?", userController.protect, userController.verif
 router.post("/sendPhoneOtpSms", userController.protect, userController.sendPhoneOtpSms);
 router.post("/verifySmsOtp", userController.protect, userController.verifySmsOtp);
 router.post("/sendRequest", userController.protect, userController.sendRequest);
+router.post("/respondRequest", userController.protect, userController.respondRequest);
+router.get("/getFriends", userController.protect, userController.getFriends);
+router.get("/getSentPendingRequests", userController.protect, userController.getSentPendingRequests);
+router.get("/getReceivedPendingRequests", userController.protect, userController.getReceivedPendingRequests);
 
 // Google Passport
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
