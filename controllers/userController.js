@@ -416,7 +416,7 @@ exports.sendRequest = catchAsync(async (req, res, next) => {
     try {
         const currentUser = await User.findById(req.user.id);
         const recipientUser = await User.findById(req.body.id);
-        if(!req.body.id){
+        if (!req.body.id) {
             res.status(400).json({
                 status: 'failure',
                 message: `Please enter the recipient id`
@@ -452,15 +452,34 @@ exports.sendRequest = catchAsync(async (req, res, next) => {
             return next();
         }
         const rowUserRequest = await UserRequest.findOne({ senderId: currentUser.id, recipientId: recipientUser.id });
-        // if(UserRequest.senderId === currentUser.id && UserRequest.recipientId === recipientUser.id){
+        // const rowUserRequest = await UserRequest.findOne({ $or: [{ senderId: currentUser.id, recipientId: recipientUser.id }, { senderId: recipientUser.id, recipientId: currentUser.id }] })
+        const reverseRequestCheck = await UserRequest.findOne({ senderId: recipientUser.id, recipientId: currentUser.id });
         if (rowUserRequest) {
             // return next(new AppError(`Request is already sent and request status is ${rowUserRequest.status}`, 400))
             res.status(200).json({
-                message: `Request is already sent and request status is ${rowUserRequest.status}`
+                message: `Request is already sent and request is ${rowUserRequest.status}`
             })
-            return next()
+            
+            return next();
         }
-
+        if (reverseRequestCheck){
+            if(reverseRequestCheck.status === 'Accept'){
+                res.status(200).json({
+                    message: `You both are already friends`
+                })
+            }
+            if(reverseRequestCheck.status === 'Pending'){
+                res.status(200).json({
+                    message: `User has already sent you request and it is pending. Please review the request`
+                })
+            }
+            if(reverseRequestCheck.status === 'Reject'){
+                res.status(200).json({
+                    message: `Reject is rejected by you`
+                })
+            }
+            return next();
+        }
         const newUserRequest = await UserRequest.create({
             senderId: currentUser.id,
             recipientId: recipientUser.id
@@ -477,3 +496,12 @@ exports.sendRequest = catchAsync(async (req, res, next) => {
         return next(new AppError("Error", 500))
     }
 })
+
+// exports.responseRequest = catchAsync(async (req, res, next) => {
+//     const currentUser = await User.findById(req.user.id);
+//     if(!currentUser){
+//         return next(new AppError("User not found or not logged in"))
+//     }
+//     const otherUser = req.body.id;
+
+// })`
