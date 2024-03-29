@@ -697,10 +697,10 @@ exports.removeFriends = catchAsync(async (req, res, next) => {
     }
     let reqRow = await UserRequest.findOneAndDelete({
         $or: [
-          { senderId: currentUser.id, recipientId: otherUser.id },
-          { senderId: otherUser.id, recipientId: currentUser.id }
+            { senderId: currentUser.id, recipientId: otherUser.id },
+            { senderId: otherUser.id, recipientId: currentUser.id }
         ]
-      });
+    });
     otherUser.friends.pull(currentUser.id)
     currentUser.friends.pull(otherUser.id)
     await otherUser.save({ validateBeforeSave: false });
