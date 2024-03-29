@@ -3,11 +3,11 @@ const mongoose = require('mongoose')
 const userRequestSchema = mongoose.Schema({
     senderId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "UserProfile",
+        ref: "User",
     },
     recipientId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "UserProfile",
+        ref: "User",
     },
     status: {
         type: String,
