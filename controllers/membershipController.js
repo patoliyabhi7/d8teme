@@ -55,8 +55,42 @@ exports.purchasePremium = catchAsync(async (req, res, next) => {
         })
         return next(new AppError("Something went wrong while purchasing membership!", 400));
     }
-    res.status(201).json({
+    const message = `Thank you for purchasing our ${planCategory} membership\n
+                    Your purchase was successfull\n
+                    Plan Category: ${planCategory}(${planType})\n
+                    Amount: ${amount}\n
+                    End Date: ${endDate}\n
+                    Please contact us for any query\n`;
+    try {
+        await sendEmail({
+            email: user.email,
+            subject: 'Premium Membership Purchase',
+            message
+        })
+        res.status(201).json({
+            status: 'success',
+            message: `Membership purchased successfully!`
+        })
+    } catch (error) {
+        return next(new AppError("There was an error sending the mail. Try again later", 500))
+    }
+})
+
+exports.getMembershipHistory = catchAsync(async (req, res, next) => {
+    const user = await User.findById(req.user.id)
+    if (!user) {
+        return next(new AppError("User not found or not logged in"))
+    }
+    const memberships = await Membership.find({ userId: user.id })
+    if (!memberships) {
+        res.status(400).json({
+            message: `No memberships found!`
+        })
+        return next(new AppError("No memberships found!", 400));
+    }
+    res.status(200).json({
         status: 'success',
-        message: `Membership purchased successfully!`
+        records: memberships.length,
+        memberships
     })
 })
