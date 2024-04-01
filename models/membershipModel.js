@@ -36,6 +36,5 @@ const membershipSchema = mongoose.Schema({
 
 // For razorpay - payment_id, signature, order_id
 
-
 const Membership = mongoose.model('Membership', membershipSchema);
 module.exports = Membership;

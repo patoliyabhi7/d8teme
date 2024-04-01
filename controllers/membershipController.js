@@ -94,3 +94,31 @@ exports.getMembershipHistory = catchAsync(async (req, res, next) => {
         memberships
     })
 })
+
+exports.cancelMembership = catchAsync(async (req, res, next) => {
+    const user = await User.findById(req.user.id)
+    if (!user) {
+        return next(new AppError("User not found or not logged in"))
+    }
+    const membership = await Membership.findOne({ userId: user.id, endDate: { $gt: Date.now() } });
+    if (!membership) {
+        res.status(400).json({
+            message: `No active membership found!`
+        })
+        return next(new AppError("No active membership found!", 400));
+    }
+    const updatedMembership = await Membership.findByIdAndUpdate(membership.id, {
+        endDate: Date.now()
+    })
+    if (!updatedMembership) {
+        res.status(400).json({
+            message: `Something went wrong while cancelling the membership!`
+        })
+        return next(new AppError("Something went wrong while cancelling the membership!", 400));
+    }
+    res.status(200).json({
+        status: 'success',
+        message: `Membership cancelled successfully!`
+    })
+})
+
