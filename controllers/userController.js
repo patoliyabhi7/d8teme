@@ -654,7 +654,7 @@ exports.getReceivedPendingRequests = catchAsync(async (req, res, next) => {
             message: `No Pending Requests Found`
         })
         return next();
-    }
+    } 
     const list = []
     for (i = 0; i < getList.length; i++) {
         const friend = await User.findById(getList[i].senderId).select("firstname lastname email profileImage bioContent");

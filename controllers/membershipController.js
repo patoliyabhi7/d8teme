@@ -4,6 +4,8 @@ const User = require('./../models/userModel');
 const Membership = require('./../models/membershipModel');
 const sendEmail = require('./../utils/email');
 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 exports.purchasePremium = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.user.id)
     if (!user) {
@@ -42,18 +44,64 @@ exports.purchasePremium = catchAsync(async (req, res, next) => {
         }
     }
 
-    const membership = await Membership.create({
-        userId: user.id,
-        endDate,
-        amount,
-        planType,
-        planCategory
-    })
-    if (!membership) {
-        res.status(400).json({
-            message: `Something went wrong while purchasing membership!`
+    try {
+        var stripePayment = await stripe.customers.create({
+            name: user.name,
+            email: user.email
         })
-        return next(new AppError("Something went wrong while purchasing membership!", 400));
+        if(stripePayment){
+            const {card_name, card_number, card_expmonth, card_expyear, card_cvc} = req.body;
+            if(!card_name || !card_number || !card_expmonth || !card_expyear || !card_cvc){
+                res.status(400).json({
+                    message: `Please enter all the required fields!`
+                })
+                return next(new AppError("Please enter all the required fields!", 400));
+            }
+            const cardToken = await stripe.tokens.create({
+                card: {
+                    name: card_name,
+                    number: card_number,
+                    exp_month: card_expmonth,
+                    exp_year: card_expyear,
+                    cvc: card_cvc
+                }
+            });
+            if(cardToken){
+                const card = await stripe.customers.createSource(stripePayment.id, {
+                    source: `${cardToken.id}`
+                });
+            }
+            if(card){
+                var charge = await stripe.charges.create({
+                    receipt_email: 'bdcyttapooiusxtfgadoiuahahxhua@gmail.com',
+                    amount: amount * 100,
+                    currency: 'INR',
+                    customer: stripePayment.id
+                })
+            }
+        }
+
+
+    } catch (error) {
+        res.status(400).json({ message: error.message })
+    }
+    if (!charge) {
+        return next(new AppError("Something went wrong while processing payment!", 400));
+    }
+    if (charge) {
+        const membership = await Membership.create({
+            userId: user.id,
+            endDate,
+            amount,
+            planType,
+            planCategory
+        })
+        if (!membership) {
+            res.status(400).json({
+                message: `Something went wrong while purchasing membership!`
+            })
+            return next(new AppError("Something went wrong while purchasing membership!", 400));
+        }
     }
     const message = `Thank you for purchasing our ${planCategory} membership\n
                     Your purchase was successfull\n
@@ -68,6 +116,7 @@ exports.purchasePremium = catchAsync(async (req, res, next) => {
             message
         })
         res.status(201).json({
+            charge,
             status: 'success',
             message: `Membership purchased successfully!`
         })
