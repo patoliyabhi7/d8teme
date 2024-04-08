@@ -711,3 +711,71 @@ exports.removeFriends = catchAsync(async (req, res, next) => {
         message: `Friend removed successfully`
     })
 })
+
+//! Code Generated from Github Copilot
+// exports.viewFriendProfile = catchAsync(async (req, res, next) => {
+//     const currentUser = await User.findById(req.user.id);
+//     if (!currentUser) {
+//         return next(new AppError('No user found with that ID', 404));
+//     }
+
+//     const friendId = req.params.id;
+//     if (!friendId) {
+//         return next(new AppError('No friend ID provided', 400));
+//     }
+
+//     const friend = await User.findOne({ _id: friendId, friends: { $in: [currentUser._id] } });
+//     if (!friend) {
+//         return next(new AppError('This user is not your friend', 403));
+//     }
+
+//     res.status(200).json({
+//         status: 'success',
+//         data: {
+//             friend
+//         }
+//     });
+// });
+
+// exports.countFriends = catchAsync(async (req, res, next) => {
+//     const currentUser = await User.findById(req.user.id);
+//     if (!currentUser) {
+//         return next(new AppError('No user found with that ID', 404));
+//     }
+
+//     const friendCount = currentUser.friends.length;
+
+//     res.status(200).json({
+//         status: 'success',
+//         data: {
+//             friendCount
+//         }
+//     });
+// });
+
+// exports.countOtherUserFriends = catchAsync(async (req, res, next) => {
+//     const currentUser = await User.findById(req.user.id);
+//     if (!currentUser) {
+//         return next(new AppError('No user found with that ID', 404));
+//     }
+
+//     const otherUserId = req.params.id;
+//     if (!otherUserId) {
+//         return next(new AppError('No user ID provided', 400));
+//     }
+
+//     const otherUser = await User.findOne({ _id: otherUserId, friends: { $in: [currentUser._id] } });
+//     if (!otherUser) {
+//         return next(new AppError('No friend found with that ID', 404));
+//     }
+
+//     const friendCount = otherUser.friends.length;
+
+//     res.status(200).json({
+//         status: 'success',
+//         data: {
+//             friendCount
+//         }
+//     });
+// });
+
